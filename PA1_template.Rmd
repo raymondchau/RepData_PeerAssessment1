@@ -1,20 +1,107 @@
 # Reproducible Research: Peer Assessment 1
 
-
 ## Loading and preprocessing the data
+First step is to load and preprocess the data. Make sure the raw data .csv is extracted to the same folder of this markdown file. 
 
-
+The following script will do the following:
+* load the data from the CSV file
+* remove all incomplete values
+```{r}
+data.raw <- read.csv("activity.csv")
+data <- data.raw[complete.cases(data.raw),]
+```
 
 ## What is mean total number of steps taken per day?
+The distribution of the steps taken per day:
+```{r}
+library("ggplot2")
+daily.steps <- aggregate(data$steps, list(data$date), sum, na.rm=TRUE)
+names(daily.steps) = c("date","steps")
+p1 <- ggplot(daily.steps, aes(x=steps)) 
+p1 + geom_histogram()
+```
 
+The mean of the total number of steps taken per day:
+```{r}
+mean(daily.steps$steps)
+```
 
+The median of the total number of steps taken per day:
+```{r}
+median(daily.steps$steps)
+```
 
 ## What is the average daily activity pattern?
+To see the daily activity pattern, see the time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis) below:
+```{r}
+avg.steps <- aggregate(data$steps, list(data$interval), mean, na.rm=TRUE)
+names(avg.steps) = c("interval","steps")
+p2 <- ggplot(avg.steps, aes(interval, steps))
+p2 + geom_line() + xlab("interval") + ylab("average number of steps")
+```
 
-
+The following 5-minute interval contains the maximum number of steps:
+```{r}
+subset(avg.steps, steps == max(avg.steps$steps))$interval
+```
 
 ## Imputing missing values
+1. The total number of missing values in the data set (i.e. the total number of rows with NAs) is:
+```{r}
+data.na <- subset(data.raw, is.na(data.raw$steps))
+nrow(data.na)
+```
 
+2. Fill in the missing values by putting average steps value for that interval:
+```{r}
+for (i in 1:nrow(data.na)) {
+    data.na[i, c("steps")] = subset(avg.steps, interval == data.na[i,]$interval)$steps
+}
+```
 
+3. The new histogram of the total number of steps taken each day after the missing values are imputted:
+```{r}
+data.fixed <- rbind(data.na, data)
+daily.fixed <- aggregate(data.fixed$steps, list(data.fixed$date), sum, na.rm=TRUE)
+names(daily.fixed) = c("date","steps")
+p3 <- ggplot(daily.fixed, aes(x=steps)) 
+p3 + geom_histogram()
+```
+
+4.The new mean of the total number of steps taken per day after missing values are imputted:
+```{r}
+mean(daily.fixed$steps)
+```
+
+The new median of the total number of steps taken per day after missing values are imputted:
+```{r}
+median(daily.fixed$steps)
+``` 
+
+The estimate is more or less the same as the estimates from the first assignment - the means are the same while the median shifted a little bit; it's because we are just replacing empty values with the means for the imputted data set, so we should expect the mean should stay the same.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+The activity patterns between weekdays and weekends:
+```{r}
+days.of.week <- vector()
+
+for (i in 1:nrow(data.fixed)) {
+    date <- as.Date(data.fixed[i,]$date)
+    weekday <- weekdays(date)
+    
+    if (weekday == "Sunday" | weekday == "Saturaday")
+        days.of.week <- c(days.of.week, "weekend")
+    else
+        days.of.week <- c(days.of.week, "weekday")
+}
+
+data.fixed <- data.frame(data.fixed, days.of.week)
+names(data.fixed)[4] = c("weekdays")
+
+avg.steps.fixed <- aggregate(data.fixed$steps, list(data.fixed$interval, data.fixed$weekdays), mean, na.rm=TRUE)
+
+names(avg.steps.fixed) = c("interval","weekdays", "steps")
+p4 <- ggplot(avg.steps.fixed, aes(interval, steps))
+p4 + geom_line() + xlab("interval") + ylab("average number of steps") + facet_grid(weekdays ~ .)
+```
+
